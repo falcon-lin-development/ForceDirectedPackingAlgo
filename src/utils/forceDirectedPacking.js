@@ -7,6 +7,7 @@ export async function forceDirectedPacking(rectangles, iterations, reRenderPage)
   const containerHeight = 1000;
   const marginThreshold = 2; // Margin to check for overlapping
   const minMoveThreshold = 0.04; // stablize the transition
+  // const delay = 16;
   // stopping conditions
   const stabilityIterations = 15; // Number of iterations to check for stability
 
@@ -88,6 +89,7 @@ export async function forceDirectedPacking(rectangles, iterations, reRenderPage)
     reRenderPage();
 
     await new Promise(resolve => requestAnimationFrame(resolve));
+    // await new Promise(resolve => setTimeout(resolve, delay));
 
 
     // Check if changes are negligible
