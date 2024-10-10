@@ -1,0 +1,13 @@
+#container {
+    width: 600px;
+    height: 1000px;
+    border: 1px solid black;
+    position: relative;
+}
+
+.rectangle {
+    position: absolute;
+    border: 1px solid #333;
+    background-color: rgba(0, 123, 255, 0.5);
+    transition: all 0.5s ease-out; /* Add this line for smooth transitions */
+}
