@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import Rectangle from './Rectangle';
-import { forceDirectedPacking } from '../utils/forceDirectedPacking';
+// import { forceDirectedPacking } from '../utils/forceDirectedPacking';
+import { rectanglePacking } from '../utils/rectPacking';
 import { Rectangle as RectangleClass } from '../utils/Rectangle';
 
 const Container = () => {
-  const [rectangles, setRectangles] = useState([
-    new RectangleClass(50, 50, 100, 80),
-    new RectangleClass(200, 100, 120, 60),
-    new RectangleClass(100, 200, 80, 100),
-    new RectangleClass(300, 150, 90, 90)
-  ]);
+  const [rectangles, setRectangles] = useState(() => {
+    const containerWidth = 600;
+    const containerHeight = 1000;
+    const minSize = 50;
+    const maxSize = 150;
+
+    return Array.from({ length: 10 }, () => {
+      const width = Math.floor(Math.random() * (maxSize - minSize + 1)) + minSize;
+      const height = Math.floor(Math.random() * (maxSize - minSize + 1)) + minSize;
+      const x = Math.floor(Math.random() * (containerWidth - width + 1));
+      const y = Math.floor(Math.random() * (containerHeight - height + 1));
+
+      return new RectangleClass(x, y, width, height);
+    });
+  });
 
   useEffect(() => {
     const runPacking = async () => {
-      await forceDirectedPacking(rectangles, 500, () => setRectangles([...rectangles]));
+      await rectanglePacking(rectangles, 500, () => setRectangles([...rectangles]));
     };
     runPacking();
   }, []);

@@ -1,76 +1,112 @@
 import { checkOverlapping } from './utils.js';
 
-// Simple force-directed algorithm
-export async function forceDirectedPacking(rectangles, iterations, reRenderPage){
-  // const repulsionForce = 10;
+export async function forceDirectedPacking(rectangles, iterations, reRenderPage) {
   const containerWidth = 600;
   const containerHeight = 1000;
-  const marginThreshold = 2; // Margin to check for overlapping
-  const minMoveThreshold = 0.04; // stablize the transition
-  // const delay = 16;
-  // stopping conditions
-  const stabilityIterations = 15; // Number of iterations to check for stability
+  const centerX = containerWidth / 2;
+  const centerY = containerHeight / 2;
+  const marginThreshold = 5;
+  const stabilityIterations = 15;
+  const attractionStrength = 0.05;
+  const repulsionStrength = 500;
 
   let stableIterations = 0;
 
+  // Find the largest rectangle
+  const largestRectIndex = rectangles.reduce((maxIndex, rect, currentIndex, arr) => 
+    rect.width * rect.height > arr[maxIndex].width * arr[maxIndex].height ? currentIndex : maxIndex
+  , 0);
 
-  for (let i = 0; i<iterations; i++){
-   let totalChange = 0;
-    let maxChange = 0;
-    const originalPositions = rectangles.map(rect => ({ x: rect.x, y: rect.y }));
+  // Place the largest rectangle at the center
+  const largestRect = rectangles[largestRectIndex];
+  largestRect.x = centerX - largestRect.width / 2;
+  largestRect.y = centerY - largestRect.height / 2;
 
-    for (let a of rectangles){
-      for (let b of rectangles){
-        if (a!==b){
-          // Calculate distance between centers
-          const dx = (b.x + b.width / 2) - (a.x + a.width / 2);
-          const dy = (b.y + b.width / 2) - (a.y + a.height / 2);
-          const distance = Math.sqrt(dx * dx + dy * dy); // Pythagoras Thms
-          const overlaps = checkOverlapping(a, b, marginThreshold);
-          const isOverlapping = overlaps.overlapping;
+  function applyForces() {
+    for (let i = 0; i < rectangles.length; i++) {
+      if (i === largestRectIndex) continue;
+      const rect = rectangles[i];
+      
+      let totalForceX = 0;
+      let totalForceY = 0;
 
-          // Apply repulsion force
-          if (isOverlapping){
-            const repulsionForce = 1 / (distance + 1); // Distance-dependent force
-            const forceX = dx * repulsionForce / 2;
-            const forceY = dy * repulsionForce / 2;
+      // Attraction to center
+      const dx = centerX - (rect.x + rect.width / 2);
+      const dy = centerY - (rect.y + rect.height / 2);
+      const distanceToCenter = Math.sqrt(dx * dx + dy * dy);
+      totalForceX += dx / distanceToCenter * attractionStrength;
+      totalForceY += dy / distanceToCenter * attractionStrength;
 
-            if(Math.abs(forceX) >= minMoveThreshold){
-              a.x -= forceX;
-              b.x += forceX;
-            }
-            if(Math.abs(forceY) >= minMoveThreshold){
-              a.y -= forceY;
-              b.y += forceY;
-            }
-          }
+      // Repulsion from other rectangles
+      for (let j = 0; j < rectangles.length; j++) {
+        if (i === j) continue;
+        const other = rectangles[j];
+        const rdx = (other.x + other.width / 2) - (rect.x + rect.width / 2);
+        const rdy = (other.y + other.height / 2) - (rect.y + rect.height / 2);
+        const distance = Math.sqrt(rdx * rdx + rdy * rdy);
+        if (distance > 0) {
+          const repulsionForce = repulsionStrength / (distance * distance);
+          totalForceX -= (rdx / distance) * repulsionForce;
+          totalForceY -= (rdy / distance) * repulsionForce;
+        }
+      }
 
-          // Apply attraction force
-          if (!isOverlapping){
-            const attractionForce = 1 / (distance + 1); // Distance-dependent force
-            const forceX = dx * attractionForce / 2;
-            const forceY = dy * attractionForce / 2;
+      // Apply forces
+      rect.x += totalForceX;
+      rect.y += totalForceY;
 
+      // Keep rectangles within container
+      rect.x = Math.max(0, Math.min(rect.x, containerWidth - rect.width));
+      rect.y = Math.max(0, Math.min(rect.y, containerHeight - rect.height));
+    }
+  }
 
-            if(Math.abs(forceX) >= minMoveThreshold){
-              a.x += forceX;
-              b.x -= forceX;
-            }
-            if(Math.abs(forceY) >= minMoveThreshold){
-              a.y += forceY;
-              b.y -= forceY;
+  function resolveOverlaps() {
+    for (let i = 0; i < rectangles.length; i++) {
+      if (i === largestRectIndex) continue;
+      const rect = rectangles[i];
+
+      for (let j = 0; j < rectangles.length; j++) {
+        if (i === j) continue;
+        const other = rectangles[j];
+        const overlap = checkOverlapping(rect, other, marginThreshold);
+
+        if (overlap.overlapping) {
+          const centerDiffX = (other.x + other.width / 2) - (rect.x + rect.width / 2);
+          const centerDiffY = (other.y + other.height / 2) - (rect.y + rect.height / 2);
+          const distance = Math.sqrt(centerDiffX * centerDiffX + centerDiffY * centerDiffY);
+          
+          if (distance > 0) {
+            const moveX = (centerDiffX / distance) * (overlap.overlapX / 2 + 1);
+            const moveY = (centerDiffY / distance) * (overlap.overlapY / 2 + 1);
+            
+            if (j !== largestRectIndex) {
+              rect.x -= moveX / 2;
+              rect.y -= moveY / 2;
+              other.x += moveX / 2;
+              other.y += moveY / 2;
+            } else {
+              rect.x -= moveX;
+              rect.y -= moveY;
             }
           }
         }
       }
-
-      // Keep reactangles widthin container
-      a.x = Math.max(0, Math.min(a.x, containerWidth - a.width));
-      a.y = Math.max(0, Math.min(a.y, containerHeight - a.height));
     }
+  }
+
+  for (let i = 0; i < iterations; i++) {
+    const originalPositions = rectangles.map(rect => ({ x: rect.x, y: rect.y }));
+
+    applyForces();
+    resolveOverlaps();
+
+    let totalChange = 0;
+    let maxChange = 0;
 
     // Calculate changes in position
     rectangles.forEach((rect, index) => {
+      if (index === largestRectIndex) return;
       const originalPos = originalPositions[index];
       const change = Math.sqrt(
         Math.pow(rect.x - originalPos.x, 2) + Math.pow(rect.y - originalPos.y, 2)
@@ -79,28 +115,21 @@ export async function forceDirectedPacking(rectangles, iterations, reRenderPage)
       maxChange = Math.max(maxChange, change);
     });
 
-    const avgChange = totalChange / rectangles.length;
-    console.log({
-      i,
-      maxChange,
-      avgChange,
-      stableIterations
-    });
+    const avgChange = totalChange / (rectangles.length - 1);
+    console.log({ i, maxChange, avgChange, stableIterations });
     reRenderPage();
 
     await new Promise(resolve => requestAnimationFrame(resolve));
-    // await new Promise(resolve => setTimeout(resolve, delay));
-
 
     // Check if changes are negligible
-    if (maxChange <= 2 && avgChange <= 0.8) {
-      stableIterations++;
-      if (stableIterations >= stabilityIterations) {
-        console.log(`Stopping early at iteration ${i + 1}. System has stabilized.`);
-        break;
-      }
-    } else {
-      stableIterations = 0;
-    }
+    // if (maxChange <= 0.5 && avgChange <= 0.2) {
+    //   stableIterations++;
+    //   if (stableIterations >= stabilityIterations) {
+    //     console.log(`Stopping early at iteration ${i + 1}. System has stabilized.`);
+    //     break;
+    //   }
+    // } else {
+    //   stableIterations = 0;
+    // }
   }
 }
